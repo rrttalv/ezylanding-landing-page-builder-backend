@@ -1,5 +1,7 @@
 const { createRoom, destroyRoom, default: Room } = require("./models/Room")
 const { createTemplate, default: Template } = require("./models/Template")
+const { saveTemplateInS3 } = require("./utils/aws")
+const { compileTemplate } = require("./utils/helpers")
 
 let io = null
 const rooms = {}
@@ -7,7 +9,6 @@ const rooms = {}
 const joinRoom = async (socket, userId, roomId) => {
   const room = await createRoom(userId, roomId, socket.id)
   socket.join(roomId)
-  console.log(room)
 }
 
 const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette, framework) => {
@@ -18,6 +19,8 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
     if(!existingTemplate){
       existingTemplate = await createTemplate(userId, templateId, framework.id)
     }
+    const compiled = compileTemplate(templateId, pages, cssFiles, palette, framework)
+    await saveTemplateInS3(templateId, compiled)
     io.sockets.to(room.roomId).emit('templateSaved', JSON.stringify(existingTemplate))
   }catch(err){
     console.log(err)

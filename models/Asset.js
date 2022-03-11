@@ -8,26 +8,34 @@ const AssetSchema = new Schema({
   name: {
     type: String
   },
-  path: {
-    type: String
+  deleted: {
+    type: Boolean,
+    default: false
   },
   extension: {
     type: String
   },
-  sourceName: {
+  mimeType: {
     type: String
+  },
+  originalName: {
+    type: String
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
 })
 
-const asset = mongoose.model('Asset', AssetSchema)
+const Asset = mongoose.model('Asset', AssetSchema)
 
-export default asset
+export default Asset
 
-export const saveAsset = async (user, name, extension, sourceName) => {
-  return await asset.create({
+export const saveAsset = async (user, name, extension, originalName) => {
+  return await Asset.create({
     user,
     name,
     extension,
-    sourceName
+    originalName
   })
 }
