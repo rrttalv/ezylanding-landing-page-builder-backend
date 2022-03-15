@@ -10,6 +10,9 @@ const UserSchema = new Schema({
   password: {
     type: String
   },
+  userCategory: {
+    type: String
+  },
   twitterProfileId: {
     type: String
   },
@@ -37,7 +40,7 @@ const UserSchema = new Schema({
 const User = mongoose.model('User', UserSchema)
 
 export const createUser = async (email, rawPassword) => {
-  const password = await bcrypt.hash(rawPassword, process.env.PASSWORD_SALT)
+  const password = await bcrypt.hashSync(rawPassword)
   return await User.create({
     email: email,
     password

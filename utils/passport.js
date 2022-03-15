@@ -9,13 +9,12 @@ import bcrypt from 'bcryptjs'
 dotenv.config()
 
 module.exports = passport => {
-
   passport.use(new LocalStrategy(
     (username, password, done) => {
-      User.findOne({ email: username }).then((err, user) => {
+      console.log(username, password)
+      User.findOne({ email: username }).then((user, err) => {
         if(err){
-          console.log(err)
-          return done(null, false, { success: false, message: 'Something when wrong' })
+          return done(err, false, { success: false, message: 'Something when wrong' })
         }
         if(!user){
           return done(null, false, { success: false, message: 'User does not exist' })
@@ -25,11 +24,10 @@ module.exports = passport => {
         }
         bcrypt.compare(password, user.password, (err, match) => {
           if(err){
-            console.log(err)
             return done(null, false, { success: false, message: 'Something went wrong' })
           }
           if(match){
-            return done(null, user)
+            return done(null, user, { success: true, redirect: '/dashboard' })
           }else{
             return done(null, false, { success: false, message: 'Wrong password' })
           }
@@ -47,7 +45,6 @@ module.exports = passport => {
     }, 
       (accessToken, refreshToken, profile, cb) => {
         findOrCreateOauth(profile.emails[0].value, profile.id).then((user, err) => {
-          console.log(err, user, '----')
           return cb(err, user)
         })
       }
