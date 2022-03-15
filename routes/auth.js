@@ -9,8 +9,7 @@ const router = new express.Router()
 
 router.get('/check', async(req, res, next) => {
   try{
-    console.log(req.isAuthenticated())
-    if(!req.user){
+    if(!req.isAuthenticated()){
       return res.status(400).json({ user: null, message: 'No user session found' })
     }
     const user = await User.findOne({ _id: req.user._id }).select('email _id')
@@ -64,6 +63,12 @@ router.post('/register', async (req, res, next) => {
   }
 })
 
+router.get('/logout', async(req, res, next) => {
+  req.session.destroy(function() {
+    res.clearCookie('connect.sid').json({ success: true, redirect: '/auth' })
+  });
+})
+
 router.post('/login', async (req, res, next) => {
   passport.authenticate('local', (err, user, info) => {
     if(err){
@@ -74,10 +79,17 @@ router.post('/login', async (req, res, next) => {
       return res.json(info)
     }
     console.log(user)
-    if(user){
+    req.login(user, async (err) => {
+      if(err){
+        console.log(err)
+        return next(err)
+      }
+
+      req.session.cookie.originalMaxAge = 365 * 24 * 60 * 60 * 1000
+
       return res.json({...info, redirect: '/dashboard', user: { email: user.email, id: user._id }})
-    }
-  })(req, res)
+    })
+  })(req, res, next)
 })
 
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }))

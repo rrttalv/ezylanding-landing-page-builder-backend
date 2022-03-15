@@ -2,7 +2,6 @@ import { Strategy as LocalStrategy } from 'passport-local'
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
 import { Strategy as GithubStrategy } from 'passport-github2'
 import { Strategy as TwitterStrategy } from 'passport-twitter'
-import passport from 'passport'
 import User, { findOrCreateOauth } from '../models/User'
 import dotenv from 'dotenv'
 import bcrypt from 'bcryptjs'
@@ -51,12 +50,12 @@ module.exports = passport => {
     )
   )
 
-  passport.serializeUser( (user, done) => {
+  passport.serializeUser((user, done) => {
     done(null, user.id);
   });
 
     passport.deserializeUser((id, done) => {
-      User.findOne({_id: id}).exec( (err, user) => {
+      User.findOne({_id: id}).exec((err, user) => {
         done(err, user);
       });
     });

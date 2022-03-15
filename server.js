@@ -36,7 +36,14 @@ db.once('open', () => {
 })
 
 app.use(require('express').json())
-app.use(cors())
+app.use(
+  cors(
+    { 
+      credentials: true, 
+      origin: [new URL('http://localhost:3000').origin]
+    }
+  )
+)
 
 const sessionStore = MongoStore.create({
   clientPromise: clientPromise,
@@ -45,12 +52,11 @@ const sessionStore = MongoStore.create({
 })
 
 app.use(session({
+  store: sessionStore,
   secret: 'asdasda',
-  resave: true,
-  rolling: false,
-  saveUninitialized: true,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 },
-  store: sessionStore
+  saveUninitialized: false,
+  resave: false,
+  cookie: { maxAge: 24 * 60 * 60 * 1000, domain: 'localhost', secure: false },
 }))
 
 app.use(passport.initialize())
