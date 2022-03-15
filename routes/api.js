@@ -33,7 +33,7 @@ router.get('/assets', async (req, res, next) => {
     const skip = Number(pageNo) * 15
     let userId = null
     if(req.user){
-      userId = req.user.id
+      //userId = req.user.id
     }
     const assets = await Asset.find({ user: userId, deleted: { $ne: true } }).sort({ createdAt: -1 }).limit(15).skip(skip)
     const isMore = assets.length === 15

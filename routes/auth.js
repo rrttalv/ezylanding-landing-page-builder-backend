@@ -64,9 +64,9 @@ router.post('/register', async (req, res, next) => {
 })
 
 router.get('/logout', async(req, res, next) => {
-  req.session.destroy(function() {
-    res.clearCookie('connect.sid').json({ success: true, redirect: '/auth' })
-  });
+  req.session.destroy();
+  res.clearCookie('connect.sid')
+  res.json({ success: true, redirect: '/' })
 })
 
 router.post('/login', async (req, res, next) => {

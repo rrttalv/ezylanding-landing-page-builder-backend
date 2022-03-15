@@ -16,6 +16,18 @@ const TemplateSchema = new Schema({
     type: Boolean,
     default: false
   },
+  pageLength: {
+    type: Number,
+    default: 1
+  },
+  categories: {
+    type: [{
+      type: String
+    }]
+  },
+  downloads: {
+    type: Number
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -19,6 +19,17 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
     if(!existingTemplate){
       existingTemplate = await createTemplate(userId, templateId, framework.id)
     }
+    if(existingTemplate){
+      let change = false
+      const changes = {}
+      if(pages.length !== existingTemplate.pageLength){
+        change = true
+        changes.pageLength = pages.length
+      }
+      if(change){
+        await Template.updateOne({ _id: existingTemplate._id }, { $set: { ...changes } })
+      }
+    }
     const compiled = compileTemplate(templateId, pages, cssFiles, palette, framework, templateMeta)
     await saveTemplateInS3(templateId, compiled)
     io.sockets.to(room.roomId).emit('templateSaved', JSON.stringify(existingTemplate))
