@@ -11,7 +11,7 @@ const joinRoom = async (socket, userId, roomId) => {
   socket.join(roomId)
 }
 
-const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette, framework) => {
+const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette, framework, templateMeta) => {
   try{
     //look for the template if it doesnt exist create one
     let existingTemplate = await Template.findOne({ templateId })
@@ -19,7 +19,7 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
     if(!existingTemplate){
       existingTemplate = await createTemplate(userId, templateId, framework.id)
     }
-    const compiled = compileTemplate(templateId, pages, cssFiles, palette, framework)
+    const compiled = compileTemplate(templateId, pages, cssFiles, palette, framework, templateMeta)
     await saveTemplateInS3(templateId, compiled)
     io.sockets.to(room.roomId).emit('templateSaved', JSON.stringify(existingTemplate))
   }catch(err){
@@ -38,7 +38,7 @@ const setSocket = (socket) => {
   io = socket
   io.sockets.on("connection", (socket) => {
     socket.on('roomInit', ({ roomId }) => joinRoom(socket, null, roomId))
-    socket.on('saveTemplate', (userId, templateId, pages, css, palette, framework) => saveTemplate(socket, userId, templateId, pages, css, palette, framework))
+    socket.on('saveTemplate', (userId, templateId, pages, css, palette, framework, templateMeta) => saveTemplate(socket, userId, templateId, pages, css, palette, framework, templateMeta))
     socket.on('disconnect', () => leaveRoom(socket))
   })
   
