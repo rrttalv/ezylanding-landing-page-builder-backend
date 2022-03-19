@@ -27,6 +27,20 @@ router.get('/template', async (req, res, next) => {
   }
 })
 
+router.get('/templates', async(req, res, next) => {
+  try{
+    const { pageNo } = req.query
+    const page = Number(pageNo)
+    const skip = page * 10
+    const templates = await Template.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(10).skip(skip)
+    const isMore = templates.length >= 10
+    res.json({ templates, isMore })
+  }catch(err){
+    console.log(err)
+    next(err)
+  }
+})
+
 router.get('/assets', async (req, res, next) => {
   try{
     const { pageNo, keyword } = req.query

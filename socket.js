@@ -26,6 +26,22 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
         change = true
         changes.pageLength = pages.length
       }
+      if(!existingTemplate.updatedAt){
+        changes.updatedAt = new Date()
+        change = true
+      }
+      if(existingTemplate.updatedAt){
+        const now = new Date()
+        const old = existingTemplate.updatedAt.getTime()
+        const nowMs = now.getTime()
+        const diff = nowMs - old
+        //Change the updated at every 2 minutes
+        if((diff * 1000) >= 60){
+          changes.updatedAt = now
+          change = true
+        }
+      }
+      console.log(changes)
       if(change){
         await Template.updateOne({ _id: existingTemplate._id }, { $set: { ...changes } })
       }

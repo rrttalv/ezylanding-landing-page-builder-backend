@@ -31,6 +31,18 @@ const TemplateSchema = new Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  title: {
+    type: String,
+    default: 'New template'
+  },
+  tags: {
+    type: [{
+      type: String
+    }]
+  },
+  updatedAt: {
+    type: Date
   }
 })
 
