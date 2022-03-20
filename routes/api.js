@@ -18,8 +18,11 @@ router.get('/template', async (req, res, next) => {
       return next('Template does not exist')
     }
     const templateJSON = await getTemplateFromS3(templateId)
+    const { title, tags } = template
+    const metadata = { title, tags }
     res.json({
-      template: templateJSON
+      template: templateJSON,
+      metadata
     })
   }catch(err){
     console.log(err)

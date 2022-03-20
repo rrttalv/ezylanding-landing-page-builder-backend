@@ -19,6 +19,7 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
     if(!existingTemplate){
       existingTemplate = await createTemplate(userId, templateId, framework.id)
     }
+    const { tags, title } = templateMeta
     if(existingTemplate){
       let change = false
       const changes = {}
@@ -41,7 +42,14 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
           change = true
         }
       }
-      console.log(changes)
+      if(title !== existingTemplate.title){
+        changes.title = title
+        change = true
+      }
+      if(tags !== existingTemplate.tags){
+        changes.tags = tags
+        change = true
+      }
       if(change){
         await Template.updateOne({ _id: existingTemplate._id }, { $set: { ...changes } })
       }
