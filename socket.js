@@ -64,17 +64,24 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
 }
 
 const leaveRoom = async (socket) => {
-  const room = await Room.findOne({ socketId: socket.id })
-  await destroyRoom(socket.id)
+  try{
+    const room = await Room.findOne({ socketId: socket.id })
+    await destroyRoom(socket.id)
+  }catch(err){
+    console.log(err)
+  }
 }
 
 
 const setSocket = (socket) => {
   io = socket
   io.sockets.on("connection", (socket) => {
-    socket.on('roomInit', ({ roomId }) => joinRoom(socket, null, roomId))
+    socket.on('roomInit', ({ roomId, userId }) => joinRoom(socket, userId, roomId))
     socket.on('saveTemplate', (userId, templateId, pages, css, palette, framework, templateMeta) => saveTemplate(socket, userId, templateId, pages, css, palette, framework, templateMeta))
-    socket.on('disconnect', () => leaveRoom(socket))
+    socket.on('thumbnail', (templateId, base64) => saveThumbnail(socket, templateId, base64))
+    socket.on('disconnect', () => {
+      leaveRoom(socket)
+    })
   })
   
   return io

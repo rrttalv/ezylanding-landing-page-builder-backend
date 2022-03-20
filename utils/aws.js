@@ -69,6 +69,24 @@ export const getAssetStringFromS3 = async (assetId, extension) => {
   }
 }
 
+export const saveThumbnailInS3 = async (file, templateId, targetName, extension) => {
+  try{
+    const { AWS_BUCKET: Bucket } = process.env
+    const s3 = getS3Client()
+    const Key = `templates/${templateId}_${targetName}.${extension}`
+    const params = {
+      ACL: 'public-read',
+      Key,
+      Bucket,
+      Body: file
+    }
+    await s3.upload(params).promise()
+  }catch(err){
+    console.log(err)
+    return err
+  }
+}
+
 export const saveAssetInS3 = async (pathToFile, assetId, extension) => {
   try{
     const { AWS_BUCKET: Bucket } = process.env
@@ -105,4 +123,8 @@ export const checkIfObjectExists = async (Key, Bucket) => {
 
 export const getAssetS3Url = (assetId, extension) => {
   return `https://ezylanding-user-assets.s3.amazonaws.com/media/${assetId}.${extension}`
+}
+
+export const getTemplateAssetS3Url = (assetName, extension) => {
+  return `https://ezylanding-user-assets.s3.amazonaws.com/${assetName}.${extension}`
 }
