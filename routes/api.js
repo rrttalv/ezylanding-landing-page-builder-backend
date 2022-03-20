@@ -22,9 +22,13 @@ router.get('/template', async (req, res, next) => {
     const templateJSON = await getTemplateFromS3(templateId)
     const { title, tags } = template
     const metadata = { title, tags }
+    const editorInfo = {
+      publicTemplate: template.publicTemplate
+    }
     res.json({
       template: templateJSON,
-      metadata
+      metadata,
+      editorInfo
     })
   }catch(err){
     console.log(err)
@@ -36,6 +40,10 @@ router.post('/template/thumbnail', upload.single('thumbnail'), async(req, res, n
   try{
     const { _id } = req.user
     const { templateId } = req.query
+    const template = await Template.findOne({ templateId })
+    if(!template || !req.user){
+      return res.json({ status: true })
+    }
     const { filename, originalname } = req.file
     const pathToFile = path.join(__dirname, `../temp/${filename}`)
     const nameArr = originalname.split('.')
