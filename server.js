@@ -12,13 +12,6 @@ const MongoStore = require("connect-mongo")
 
 const app = express()
 const httpServer = require("http").createServer(app)
-const io = require("socket.io")(httpServer, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
-})
-setSocket(io)
 
 dotenv.config()
 const port = 4000 || process.env.PORT
@@ -51,14 +44,35 @@ const sessionStore = MongoStore.create({
   stringify: false
 })
 
-app.use(session({
+const sessionMiddleware = session({
   store: sessionStore,
   secret: 'asdasda',
   saveUninitialized: false,
   resave: false,
   cookie: { maxAge: 24 * 60 * 60 * 1000, domain: 'localhost', secure: false },
-}))
+})
 
+const io = require("socket.io")(httpServer, {
+  cors: {
+    origin: 'http://localhost:3000',
+    credentials: true,
+    methods: ['GET', 'POST']
+  }
+})
+
+const wrap = middleware => (socket, next) => middleware(socket.request, {}, next)
+
+io.of('/').use(wrap(sessionMiddleware))
+io.of('/').use(wrap(passport.initialize()))
+io.of('/').use(wrap(passport.session()))
+
+io.use((socket, next) => {
+  next()
+});
+
+setSocket(io)
+
+app.use(sessionMiddleware)
 app.use(passport.initialize())
 app.use(passport.session())
 

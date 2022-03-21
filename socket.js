@@ -1,5 +1,6 @@
 const { createRoom, destroyRoom, default: Room } = require("./models/Room")
 const { createTemplate, default: Template } = require("./models/Template")
+const { default: User } = require("./models/User")
 const { saveTemplateInS3 } = require("./utils/aws")
 const { compileTemplate } = require("./utils/helpers")
 
@@ -13,9 +14,18 @@ const joinRoom = async (socket, userId, roomId) => {
 
 const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette, framework, templateMeta) => {
   try{
+    if(!socket.request.isAuthenticated()){
+      return
+    }
     //look for the template if it doesnt exist create one
     let existingTemplate = await Template.findOne({ templateId })
     const room = await Room.findOne({ socketId: socket.id })
+    if(existingTemplate){
+      const user = await User.findOne({ _id: socket.request.user._id })
+      if(!user || String(user._id) !== String(existingTemplate.user)){
+        return
+      }
+    }
     if(!existingTemplate){
       existingTemplate = await createTemplate(userId, templateId, framework.id)
     }
@@ -56,7 +66,9 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
     }
     const compiled = compileTemplate(templateId, pages, cssFiles, palette, framework, templateMeta)
     await saveTemplateInS3(templateId, compiled)
-    io.sockets.to(room.roomId).emit('templateSaved', JSON.stringify(existingTemplate))
+    if(room && room.roomId){
+      io.sockets.to(room.roomId).emit('templateSaved', JSON.stringify(existingTemplate))
+    }
   }catch(err){
     console.log(err)
     //emit error to room

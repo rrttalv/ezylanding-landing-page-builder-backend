@@ -14,16 +14,25 @@ const router = new express.Router()
 
 router.get('/template', async (req, res, next) => {
   try{
-    const { templateId } = req.query
+    const { copy, templateId } = req.query
+    if(!req.user){
+      return next('No user')
+    }
     const template = await Template.findOne({ templateId })
     if(!template){
       return next('Template does not exist')
+    }
+    if(!copy && String(template.user) !== String(req.user._id)){
+      return next('You do not have access to this template')
+    }
+    if(copy && !template.publicTemplate){
+      return next('You do not have access to this template')
     }
     const templateJSON = await getTemplateFromS3(templateId)
     const { title, tags } = template
     const metadata = { title, tags }
     const editorInfo = {
-      publicTemplate: template.publicTemplate
+      publicTemplate: copy ? false : template.publicTemplate
     }
     res.json({
       template: templateJSON,
@@ -97,7 +106,7 @@ router.get('/assets', async (req, res, next) => {
     const skip = Number(pageNo) * 15
     let userId = null
     if(req.user){
-      //userId = req.user._id
+      userId = req.user._id
     }
     const assets = await Asset.find({ user: userId, deleted: { $ne: true } }).sort({ createdAt: -1 }).limit(15).skip(skip)
     const isMore = assets.length === 15

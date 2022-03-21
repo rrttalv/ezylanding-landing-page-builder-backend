@@ -50,6 +50,7 @@ router.post('/register', async (req, res, next) => {
       if(err){
         next(err)
       }else{
+        req.session.cookie.originalMaxAge = 604800 * 1000
         res.json({
           success: true,
           redirect: '/dashboard',
@@ -78,15 +79,12 @@ router.post('/login', async (req, res, next) => {
     if(!user || !info.success){
       return res.json(info)
     }
-    console.log(user)
     req.login(user, async (err) => {
       if(err){
         console.log(err)
         return next(err)
       }
-
-      req.session.cookie.originalMaxAge = 365 * 24 * 60 * 60 * 1000
-
+      req.session.cookie.originalMaxAge = 604800 * 1000
       return res.json({...info, redirect: '/dashboard', user: { email: user.email, id: user._id }})
     })
   })(req, res, next)
