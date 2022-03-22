@@ -37,6 +37,7 @@
     "passport-twitter": "^1.0.4",
     "sharp": "^0.30.3",
     "socket.io": "^4.4.1",
+    "stripe": "^8.210.0",
     "uuid": "^8.3.2"
   }
 }

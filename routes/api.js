@@ -6,7 +6,13 @@ import { checkIfObjectExists, getAssetS3Url, getAssetStringFromS3, getTemplateAs
 import multer from 'multer'
 import Asset, { saveAsset } from '../models/Asset'
 import { resizePreviewImage } from '../utils/helpers'
+import stripeLib from 'stripe'
 import fs from 'fs'
+import StripeItem from '../models/StripeItem'
+import dotenv from 'dotenv'
+dotenv.config()
+
+const stripe = stripeLib(process.env.STRIPE_SECRET)
 
 const upload = multer({ dest: './temp' })
 
@@ -45,6 +51,29 @@ router.get('/template', async (req, res, next) => {
   }
 })
 
+router.post('/payment-intent', async(req, res, next) => {
+  try{
+    const { tag } = req.body
+    const item = await StripeItem.findOne({ tag })
+    if(!item){
+      return next('No valid item')
+    }
+    const intent = await stripe.paymentIntents.create({
+      amount: item.price * 100,
+      currency: 'usd',
+      automatic_payment_methods: {
+        enabled: true
+      }
+    })
+    res.send({
+      clientSecret: intent.client_secret
+    })
+  }catch(err){
+    console.log(err)
+    next(err)
+  }
+})
+
 router.post('/template/thumbnail', upload.single('thumbnail'), async(req, res, next) => {
   try{
     const { _id } = req.user
@@ -70,6 +99,11 @@ router.post('/template/thumbnail', upload.single('thumbnail'), async(req, res, n
 
 router.get('/templates', async(req, res, next) => {
   try{
+    /*
+    await StripeItem.create({ name: 'Single template', stripeId: 'price_1KfND8DNHncdiETbB857zYIi', tag: 'single', price: 9 })
+    await StripeItem.create({ name: 'Monthly plan', stripeId: 'price_1Kg4HeDNHncdiETbfO2Ti3nv', tag: 'monthly', price: 20 })
+    await StripeItem.create({ name: 'Yearly plan', stripeId: 'price_1Kg4HeDNHncdiETbYdOsQcqD', tag: 'yearly', price: 200 })
+    */
     const { pageNo } = req.query
     const page = Number(pageNo)
     const skip = page * 10
