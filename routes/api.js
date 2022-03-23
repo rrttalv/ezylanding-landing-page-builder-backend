@@ -10,6 +10,8 @@ import stripeLib from 'stripe'
 import fs from 'fs'
 import StripeItem from '../models/StripeItem'
 import dotenv from 'dotenv'
+import User from '../models/User'
+import Subscription, { initSubscription } from '../models/Subscription'
 dotenv.config()
 
 const stripe = stripeLib(process.env.STRIPE_SECRET)
@@ -55,16 +57,37 @@ router.post('/payment-intent', async(req, res, next) => {
   try{
     const { tag } = req.body
     const item = await StripeItem.findOne({ tag })
+    if(!req.user){
+      return next('No valid user')
+    }
+    const user = await User.findOne({ _id: req.user._id })
+    if(!user){
+      return next('No user found')
+    }
+    let customerId = user.stripeCustomerId
+    if(!user.stripeCustomerId){
+      const customer = await stripe.customers.create({
+        email: user.email
+      });
+      customerId = customer.id
+      await User.updateOne({ _id: user._id }, { $set: { stripeCustomerId: customer.id } })
+    }
     if(!item){
       return next('No valid item')
+    }
+    const existingSubscription = await Subscription.findOne({ user: user._id, valid: { $eq: true } })
+    if(existingSubscription){
+      return next('You are already a subscriber')
     }
     const intent = await stripe.paymentIntents.create({
       amount: item.price * 100,
       currency: 'usd',
+      customer: customerId,
       automatic_payment_methods: {
         enabled: true
       }
     })
+    await initSubscription(user._id, item.price, customerId, intent.id, item.tag)
     res.send({
       clientSecret: intent.client_secret
     })
@@ -72,6 +95,31 @@ router.post('/payment-intent', async(req, res, next) => {
     console.log(err)
     next(err)
   }
+})
+
+router.get('/stripe/callback', async(req, res, next) => {
+
+})
+
+router.post('/stripe/webhook', async(req, res, next) => {
+  const sig = req.headers['stripe-signature']
+  const { STRIPE_ENDPOINT_SECRET } = process.env
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_ENDPOINT_SECRET)
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`)
+  }
+  switch(event.type){
+    case 'payment_intent.succeeded':
+      //do smth
+      break
+    case 'payment_intent.payment_failed':
+      //do smth
+      break
+    default: 
+      break
+  }
+  res.send('')
 })
 
 router.post('/template/thumbnail', upload.single('thumbnail'), async(req, res, next) => {

@@ -22,6 +22,9 @@ const UserSchema = new Schema({
   githubId: {
     type: String
   },
+  stripeCustomerId: {
+    type: String
+  },
   billingInfo: {
     firstName: {
       type: String
