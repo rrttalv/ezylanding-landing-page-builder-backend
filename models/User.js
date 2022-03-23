@@ -25,14 +25,6 @@ const UserSchema = new Schema({
   stripeCustomerId: {
     type: String
   },
-  billingInfo: {
-    firstName: {
-      type: String
-    },
-    lastName: {
-      type: String
-    }
-  },
   level: {
     type: Number,
     default: 1

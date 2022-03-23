@@ -28,7 +28,9 @@ db.once('open', () => {
   console.log('Mongodb Connection Successful')
 })
 
-app.use(require('express').json())
+app.use('/api/stripe/webhook', express.raw({type: 'application/json'}))
+app.use(express.json())
+
 app.use(
   cors(
     { 

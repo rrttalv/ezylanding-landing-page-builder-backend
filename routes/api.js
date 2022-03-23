@@ -11,7 +11,8 @@ import fs from 'fs'
 import StripeItem from '../models/StripeItem'
 import dotenv from 'dotenv'
 import User from '../models/User'
-import Subscription, { initSubscription } from '../models/Subscription'
+import Subscription, { initSubscription, completeSubscription } from '../models/Subscription'
+import PaymentMethod, { createPaymentMethod, changeDefaultMethod } from '../models/PaymentMethods'
 dotenv.config()
 
 const stripe = stripeLib(process.env.STRIPE_SECRET)
@@ -53,7 +54,7 @@ router.get('/template', async (req, res, next) => {
   }
 })
 
-router.post('/payment-intent', async(req, res, next) => {
+router.post('/billing/payment-intent', async(req, res, next) => {
   try{
     const { tag } = req.body
     const item = await StripeItem.findOne({ tag })
@@ -79,17 +80,25 @@ router.post('/payment-intent', async(req, res, next) => {
     if(existingSubscription){
       return next('You are already a subscriber')
     }
-    const intent = await stripe.paymentIntents.create({
-      amount: item.price * 100,
-      currency: 'usd',
+    //Delete all old inactive subscription attempts
+    await Subscription.deleteMany({ user: user._id, valid: { $eq: false }, confirmed: { $eq: false }, startDate: { $eq: null }, endDate: { $eq: null } })
+    const stripeSubscription = await stripe.subscriptions.create({
       customer: customerId,
-      automatic_payment_methods: {
-        enabled: true
-      }
+      items: [
+        { price: item.stripeId }
+      ],
+      payment_behavior: 'default_incomplete',
+      expand: ['latest_invoice.payment_intent']
     })
-    await initSubscription(user._id, item.price, customerId, intent.id, item.tag)
+    const { 
+      latest_invoice: { payment_intent: { id: paymentIntentId, client_secret: clientSecret } }, 
+      id: subscriptionId 
+    } = stripeSubscription
+    await initSubscription(user._id, item.price, customerId, paymentIntentId, item.tag, subscriptionId)
     res.send({
-      clientSecret: intent.client_secret
+      subscriptionId,
+      paymentIntentId,
+      clientSecret
     })
   }catch(err){
     console.log(err)
@@ -97,16 +106,164 @@ router.post('/payment-intent', async(req, res, next) => {
   }
 })
 
-router.get('/stripe/callback', async(req, res, next) => {
-
+router.put('/billing/discard-subscription', async(req, res, next) => {
+  try{
+    if(!req.user){
+      return next('No valid user')
+    }
+    const { subscriptionId } = req.body
+    const subscription = await Subscription.findOne({ subscriptionId, user: req.user._id, valid: { $ne: true } })
+    if(!subscription){
+      return next('Subscription is already active')
+    }
+    await Subscription.deleteOne({ _id: subscription._id })
+    await stripe.subscriptions.del(
+      subscriptionId
+    )
+    res.json({ status: true })
+  }catch(err){
+    console.log(err)
+    next(err)
+  }
 })
 
+router.post('/billing/create-method', async(req, res, next) => {
+  if(!req.user){
+    return next('No user')
+  }
+  try{
+    const { paymentMethodId } = req.body
+    const user = await User.findOne({ _id: req.user._id })
+    const paymentMethod = await stripe.paymentMethods.attach(
+      paymentMethodId,
+      {customer: user.stripeCustomerId}
+    )
+    //brand, expiryMonth, expiryYear, lastDigits, stripePaymentMethodId, stripeCustomerId, user, setDefault = false
+    if(paymentMethod){
+      const { brand, exp_month, exp_year, last4, id: methodId, billing_details: { name } } = paymentMethod
+      const method = await createPaymentMethod(brand, exp_month, exp_year, last4, methodId, user.stripeCustomerId, user._id, name)
+      if(method.default){
+        await stripe.customers.update(user.stripeCustomerId, { invoice_settings: { default_payment_method: methodId } })
+      }
+      return res.json({ status: true })
+    }else{
+      return res.status(400).json({ status: false, message: 'Failed to create payment method' })
+    }
+  }catch(err){
+    console.log(err)
+    next(err)
+  }
+})
+
+router.get('/billing/payment-methods', async(req, res, next) => {
+  try{
+    if(!req.user){
+      return next('No user found')
+    }
+    const methods = await PaymentMethod.find({ user: req.user._id })
+    res.json({ methods })
+  }catch(err){
+    console.log(err)
+    next(err)
+  }
+})
+
+router.put('/billing/update-payment-method', async(req, res, next) => {
+  try{
+    const { methodId } = req.body
+    if(!req.user || !methodId){
+      return res.status(400).json({ status: false })
+    }
+    const user = await User.findOne({ _id: req.user._id })
+    const method = await PaymentMethod.findOne({ _id: methodId })
+    if(!method || !user){
+      return next('No matching payment method or user found')
+    }
+    await stripe.customers.update(user.stripeCustomerId, { invoice_settings: { default_payment_method: method._id } })
+    await changeDefaultMethod(user._id, method._id)
+    const methods = await PaymentMethod.find({ user: user._id })
+    res.json({ methods })
+  }catch(err){
+    console.log(err)
+    next(err)
+  }
+})
+
+router.get('/stripe/callback', async(req, res, next) => {
+  try{
+    const { intentId, subscriptionId } = req.query
+    const { APP_URL: appUrl } = process.env
+    if(!req.user){
+      return res.redirect(appUrl + '/auth')
+    }
+    const user = await User.findOne({ _id: req.user._id })
+    if(!user || !user.stripeCustomerId){
+      return res.redirect(appUrl + '/profile?billing=true&billingError=noCustomer')
+    }
+    const paymentIntent = await stripe.paymentIntents.retrieve(intentId)
+    const paymentMethods = await stripe.paymentMethods.list({
+      customer: user.stripeCustomerId,
+      type: 'card',
+    })
+    const currentPaymentMethod = await stripe.paymentMethods.retrieve(
+      paymentIntent.payment_method
+    )
+    const existingMethod = await PaymentMethod.findOne(({ stripePaymentMethodId: currentPaymentMethod.id, stripeCustomerId: user.stripeCustomerId }))
+    if(!existingMethod){
+      const { card: { brand, exp_month, exp_year, last4 }, id: methodId } = currentPaymentMethod
+      const method = await createPaymentMethod(brand, exp_month, exp_year, last4, methodId, user.stripeCustomerId, user._id)
+    }
+    let activateSubscription = false
+    let billingError = null
+    switch(paymentIntent.status){
+      case "succeeded":
+        activateSubscription = true
+        break
+      case "processing":
+        activateSubscription = false
+        billingError = 'paymentProcessing'
+        break
+      case "payment_failed":
+        activateSubscription = false
+        billingError = 'paymentFailed'
+        break
+      default:
+        break
+    }
+    const subscription = await Subscription.findOne({ stripeCustomerId: user.stripeCustomerId, subscriptionId, paymentIntentId: paymentIntent.id }).sort({ createdAt: -1 })
+    if(!subscription){
+      return res.redirect(appUrl + '/profile?activeView=billing&billingError=noSub')
+    }
+    if(activateSubscription){
+      const item = await StripeItem.findOne({ tag: subscription.subscriptionTag })
+      const stripeSubscription = await stripe.subscriptions.update(
+        subscriptionId,
+        { default_payment_method: paymentIntent.payment_method },
+      )
+      const completed = await completeSubscription(paymentIntent.id, stripeSubscription.id)
+      if(!completed){
+        return res.redirect(appUrl + '/profile?billing=true&billingError=failedSubUpdate')
+      }else{
+        return res.redirect(appUrl + '/profile?billing=true')
+      }
+    }else{
+      return res.redirect(appUrl + `/profile?billing=true&billingError=${billingError}`)
+    }
+  }catch(err){
+    console.log(err)
+    return res.redirect(process.env.APP_URL + '/profile?billing=true&billingError=unknown')
+  }
+})
+
+//NEED RAW BODY
 router.post('/stripe/webhook', async(req, res, next) => {
   const sig = req.headers['stripe-signature']
-  const { STRIPE_ENDPOINT_SECRET } = process.env
+  const secret = process.env.ENV === 'development' ? 'whsec_75024d912297a8aa4d34be5b515e101f2a702d234e6408f624bd98c488669706' : process.env.STRIPE_ENDPOINT_SECRET
+  let event = null
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_ENDPOINT_SECRET)
+    event = stripe.webhooks.constructEvent(req.body, sig, secret)
   } catch (err) {
+    console.log(err)
     return res.status(400).send(`Webhook Error: ${err.message}`)
   }
   switch(event.type){
