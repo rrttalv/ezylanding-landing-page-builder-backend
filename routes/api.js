@@ -6,12 +6,13 @@ import { checkIfObjectExists, getAssetS3Url, getAssetStringFromS3, getTemplateAs
 import multer from 'multer'
 import Asset, { saveAsset } from '../models/Asset'
 import { resizePreviewImage } from '../utils/helpers'
+import { camelCase as dashToCamel } from 'lodash'
 import stripeLib from 'stripe'
 import fs from 'fs'
 import StripeItem from '../models/StripeItem'
 import dotenv from 'dotenv'
 import User from '../models/User'
-import Subscription, { initSubscription, completeSubscription } from '../models/Subscription'
+import Subscription, { initSubscription, completeSubscription, findActiveSubscription } from '../models/Subscription'
 import PaymentMethod, { createPaymentMethod, changeDefaultMethod } from '../models/PaymentMethods'
 dotenv.config()
 
@@ -51,6 +52,44 @@ router.get('/template', async (req, res, next) => {
   }catch(err){
     console.log(err)
     next(err)
+  }
+})
+
+router.get('/billing/subscription', async(req, res, next) => {
+  try{
+    if(!req.user){
+      return next('No valid user')
+    }
+    const sub = await findActiveSubscription(req.user._id)
+    const subscription = await stripe.subscriptions.retrieve(
+      sub.subscriptionId
+    )
+    if(!sub || !subscription){
+      return next('No active subscription')
+    }
+    const keys = ['created', 'current_period_end', 'current_period_start']
+    const nestedKeys = ['unit_amount_decimal']
+    let subscriptionDetails = {}
+    keys.forEach(key => {
+      //Handle the subscription timestamp conversion stuff automatically
+      subscriptionDetails[dashToCamel(key)] = subscription[key] * 1000
+    })
+    const { items: { data } } = subscription
+    const [firstItem] = data
+    const { plan: { interval, amount_decimal, active } } = firstItem
+    const amount = Number(amount_decimal)
+    subscriptionDetails = {
+      ...subscriptionDetails,
+      interval,
+      cancelled: sub.cancelled,
+      amount: amount,
+      amountConverted: amount / 100,
+      active
+    }
+    res.json({ subscriptionDetails })
+  }catch(err){
+    console.log(err)
+    return next(err)
   }
 })
 

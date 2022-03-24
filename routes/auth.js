@@ -1,5 +1,6 @@
 import express from 'express'
 import User, { createUser } from '../models/User'
+import Subscription, { findActiveSubscription } from '../models/Subscription'
 import passport from 'passport'
 import dotenv from 'dotenv'
 import { validateEmail } from '../utils/helpers'
@@ -13,8 +14,9 @@ router.get('/check', async(req, res, next) => {
       return res.status(400).json({ user: null, message: 'No user session found' })
     }
     const user = await User.findOne({ _id: req.user._id }).select('email _id')
+    const subscription = await findActiveSubscription(user._id)
     if(user){
-      return res.json({ user })
+      return res.json({ user, subscription })
     }
   }catch(err){
     console.log(err)
