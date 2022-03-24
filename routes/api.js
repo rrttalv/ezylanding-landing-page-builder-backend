@@ -55,6 +55,41 @@ router.get('/template', async (req, res, next) => {
   }
 })
 
+router.get('/billing/invoices', async(req, res, next) => {
+  try{
+    if(!req.user){
+      return next('No valid user')
+    }
+    const { subscriptionInvoices } = req.query
+    let invoiceList = []
+    const user = await User.findOne({ _id: req.user._id })
+    const sub = await Subscription.findOne({ user: user._id, valid: true })
+    if(!sub){
+      return next('No valid subscription')
+    }
+    if(subscriptionInvoices){
+      const subscription = sub.subscriptionId
+      const paidInvoices = await stripe.invoices.list({
+        limit: 30,
+        subscription,
+        status: 'paid'
+      })
+      const unpaidInvoices = await stripe.invoices.list({ 
+        limit: 10,
+        subscription,
+        status: 'open'
+      })
+      invoiceList = [...unpaidInvoices.data, ...paidInvoices.data]
+    }else{
+
+    }
+    res.json({ invoiceList })
+  }catch(err){
+    console.log(err)
+    next(err)
+  }
+})
+
 router.get('/billing/subscription', async(req, res, next) => {
   try{
     if(!req.user){
@@ -72,15 +107,15 @@ router.get('/billing/subscription', async(req, res, next) => {
     let subscriptionDetails = {}
     keys.forEach(key => {
       //Handle the subscription timestamp conversion stuff automatically
-      subscriptionDetails[dashToCamel(key)] = subscription[key] * 1000
+      subscriptionDetails[dashToCamel(key)] = new Date(subscription[key] * 1000)
     })
     const { items: { data } } = subscription
     const [firstItem] = data
-    const { plan: { interval, amount_decimal, active } } = firstItem
+    const { plan: { amount_decimal, active } } = firstItem
     const amount = Number(amount_decimal)
     subscriptionDetails = {
       ...subscriptionDetails,
-      interval,
+      interval: sub.subscriptionTag,
       cancelled: sub.cancelled,
       amount: amount,
       amountConverted: amount / 100,

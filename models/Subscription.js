@@ -77,6 +77,6 @@ export const setSubscriptionId = async (stripeCustomerId, id) => {
 }
 
 export const findActiveSubscription = async user => {
-  const selectString = 'subscriptionTag _id valid confirmed subscriptionId stripeCustomerId startDate endDate'
+  const selectString = 'subscriptionTag _id valid confirmed subscriptionId stripeCustomerId startDate cancelled endDate'
   return await Subscription.findOne({ user, endDate: { $gte: new Date() }, valid: { $eq: true } }).select(selectString)
 }
