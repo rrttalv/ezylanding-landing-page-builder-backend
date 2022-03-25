@@ -35,7 +35,7 @@ app.use(
   cors(
     { 
       credentials: true, 
-      origin: [new URL('http://localhost:3000').origin]
+      origin: [new URL(process.env.APP_URL).origin]
     }
   )
 )
@@ -56,7 +56,7 @@ const sessionMiddleware = session({
 
 const io = require("socket.io")(httpServer, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: process.env.APP_URL,
     credentials: true,
     methods: ['GET', 'POST']
   }
