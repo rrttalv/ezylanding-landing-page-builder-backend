@@ -355,6 +355,9 @@ router.post('/stripe/webhook', async(req, res, next) => {
 
 router.post('/template/thumbnail', upload.single('thumbnail'), async(req, res, next) => {
   try{
+    if(!req.user){
+      return next('Failed to create template preview, no user found')
+    }
     const { _id } = req.user
     const { templateId } = req.query
     const template = await Template.findOne({ templateId })

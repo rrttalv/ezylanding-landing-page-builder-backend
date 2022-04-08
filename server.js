@@ -51,7 +51,7 @@ const sessionMiddleware = session({
   secret: 'asdasda',
   saveUninitialized: false,
   resave: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000, domain: 'localhost', secure: false },
+  cookie: { maxAge: 604800 * 1000, domain: 'localhost', secure: false },
 })
 
 const io = require("socket.io")(httpServer, {
