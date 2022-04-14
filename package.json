@@ -36,6 +36,7 @@
     "passport-google-oauth20": "^2.0.0",
     "passport-local": "^1.0.0",
     "passport-twitter": "^1.0.4",
+    "puppeteer": "^13.5.2",
     "sharp": "^0.30.3",
     "socket.io": "^4.4.1",
     "stripe": "^8.210.0",

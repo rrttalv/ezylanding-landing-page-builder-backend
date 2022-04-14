@@ -1,8 +1,9 @@
 const { createRoom, destroyRoom, default: Room } = require("./models/Room")
 const { createTemplate, default: Template } = require("./models/Template")
 const { default: User } = require("./models/User")
-const { saveTemplateInS3 } = require("./utils/aws")
-const { compileTemplate } = require("./utils/helpers")
+const { saveThumbnailInS3 } = require("./utils/aws")
+const { compileTemplate, resizePreviewImage } = require("./utils/helpers")
+const { renderPreviewImage } = require("./utils/preview")
 
 let io = null
 const rooms = {}
@@ -84,13 +85,24 @@ const leaveRoom = async (socket) => {
   }
 }
 
+const savePreview = async (socket, templateId, html) => {
+  try{
+    const base64 = await renderPreviewImage(html)
+    const file = Buffer.from(base64, 'base64')
+    const thumb = await resizePreviewImage(file)
+    await saveThumbnailInS3(thumb, templateId, 'thumb', 'jpeg')
+    await saveThumbnailInS3(file, templateId, 'preview', 'png')
+  }catch(err){
+    console.log(err)
+  }
+}
 
 const setSocket = (socket) => {
   io = socket
   io.sockets.on("connection", (socket) => {
     socket.on('roomInit', ({ roomId, userId }) => joinRoom(socket, userId, roomId))
     socket.on('saveTemplate', (userId, templateId, pages, css, palette, framework, templateMeta) => saveTemplate(socket, userId, templateId, pages, css, palette, framework, templateMeta))
-    socket.on('thumbnail', (templateId, base64) => saveThumbnail(socket, templateId, base64))
+    socket.on('thumbnail', (templateId, html) => savePreview(socket, templateId, html))
     socket.on('disconnect', () => {
       leaveRoom(socket)
     })
