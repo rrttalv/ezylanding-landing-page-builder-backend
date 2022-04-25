@@ -1,7 +1,7 @@
 const { createRoom, destroyRoom, default: Room } = require("./models/Room")
 const { createTemplate, default: Template } = require("./models/Template")
 const { default: User } = require("./models/User")
-const { saveThumbnailInS3 } = require("./utils/aws")
+const { saveThumbnailInS3, saveTemplateInS3 } = require("./utils/aws")
 const { compileTemplate, resizePreviewImage } = require("./utils/helpers")
 const { renderPreviewImage } = require("./utils/preview")
 
@@ -54,6 +54,7 @@ const saveTemplate = async (socket, userId, templateId, pages, cssFiles, palette
         }
       }
       if(title !== existingTemplate.title){
+        changes.slug = title.toLowerCase().split(' ').join('-')
         changes.title = title
         change = true
       }

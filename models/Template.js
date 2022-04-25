@@ -23,6 +23,13 @@ const TemplateSchema = new Schema({
     type: Boolean,
     default: false
   },
+  featured: {
+    type: Boolean,
+    default: false
+  },
+  slug: {
+    type: String
+  },
   pageLength: {
     type: Number,
     default: 1
